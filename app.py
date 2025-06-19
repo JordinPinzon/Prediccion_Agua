@@ -34,7 +34,7 @@ with tab1:
     col3.metric("Mínimo estimado (m)", f"{nivel_min:.2f}")
     col4.metric("Pendiente total (m)", f"{pendiente:.2f}")
 
-    # Mostrar RMSE del modelo
+    # Mostrar RMSE del modelo si está disponible
     rmse = forecast.attrs.get("rmse_nivel", None)
     if rmse is not None:
         st.metric("📉 Error del modelo (RMSE)", f"{rmse:.2f} m")
@@ -64,12 +64,17 @@ with tab1:
     ax.plot(df_filtrado["ds"], df_filtrado["nivel_estimado"], label="Nivel estimado", color="#1f77b4", linewidth=2)
 
     # Línea de alerta visual
-    nivel_critico = 5.0  # puedes cambiar el umbral
+    nivel_critico = 5.0
     ax.axhline(y=nivel_critico, color='red', linestyle='--', label=f'Alerta crítica ({nivel_critico} m)')
+
+    # Intervalo de confianza si está disponible
+    if "yhat_lower" in df_filtrado.columns and "yhat_upper" in df_filtrado.columns:
+        ax.fill_between(df_filtrado["ds"], df_filtrado["yhat_lower"], df_filtrado["yhat_upper"],
+                        color="#1f77b4", alpha=0.2, label="Intervalo de confianza")
 
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Nivel estimado (m)")
-    ax.set_title("Predicción del Nivel de Agua hasta 2023")
+    ax.set_title(f"Predicción del Nivel de Agua hasta {fecha_max.year}")
     ax.grid()
     ax.legend()
     st.pyplot(fig)
@@ -89,19 +94,21 @@ with tab3:
     import folium
 
     # Coordenadas aproximadas de la estación H44 Antisana (ajústalas si tienes las reales)
-    lat = -0.457  # ejemplo
+    lat = -0.457
     lon = -78.205
 
-    # Contenido del popup
+    # Validación del RMSE para mostrar en popup
+    error_text = f"{rmse:.2f} m" if rmse is not None else "No disponible"
+
     popup_html = f"""
     <b>Estación H44 Antisana</b><br>
     Nivel actual: {nivel_actual:.2f} m<br>
     Nivel máximo: {nivel_max:.2f} m<br>
     Nivel mínimo: {nivel_min:.2f} m<br>
-    Error del modelo (RMSE): {rmse:.2f} m
+    Error del modelo (RMSE): {error_text}
     """
 
-    # Crear mapa y marcador
+    # Crear mapa
     mapa = folium.Map(location=[lat, lon], zoom_start=12)
     folium.Marker(
         location=[lat, lon],
@@ -110,5 +117,16 @@ with tab3:
         icon=folium.Icon(color="blue", icon="info-sign")
     ).add_to(mapa)
 
-    # Mostrar mapa en Streamlit
-    folium_static(mapa)
+    # Mostrar mapa en pantalla completa
+    st.markdown(
+        """
+        <style>
+        .element-container:has(.folium-map) {
+            width: 100% !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    folium_static(mapa, width=1400, height=600)
