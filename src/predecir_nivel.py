@@ -1,34 +1,54 @@
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import RandomForestRegressor
 import pandas as pd
-import numpy as np
-
 
 def predecir_nivel(forecast, df_original):
-    # Agregar columnas de mes y año a los datos originales
-    df_original = df_original.copy()
-    df_original["mes"] = df_original["fecha"].dt.month
-    df_original["año"] = df_original["fecha"].dt.year
+    df = df_original.copy()
+    
+    # Extraer variables estacionales
+    df["mes"] = df["fecha"].dt.month
+    df["semana"] = df["fecha"].dt.isocalendar().week
+    df["año"] = df["fecha"].dt.year
+    df["dias_desde_inicio"] = (df["fecha"] - df["fecha"].min()).dt.days
 
-    # Entrenar el modelo multivariable
-    reg = LinearRegression()
-    reg.fit(df_original[["caudal", "mes", "año"]], df_original["nivel"])
+    # Lags (valores anteriores)
+    df["caudal_lag1"] = df["caudal"].shift(1)
+    df["precipitacion"] = df.get("precipitacion", 0)
+    df["precipitacion_lag1"] = df["precipitacion"].shift(1)
 
-    # Calcular RMSE del modelo con los datos de entrenamiento
-    y_true = df_original["nivel"]
-    y_pred = reg.predict(df_original[["caudal", "mes", "año"]])
-    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    # Interacciones
+    df["caudal_x_mes"] = df["caudal"] * df["mes"]
+    df["precipitacion_x_semana"] = df["precipitacion"] * df["semana"]
 
-    # Preparar el forecast para predecir
+    # Eliminar filas nulas por lags
+    df = df.dropna()
+
+    # Entrenamiento
+    features = ["caudal", "precipitacion", "mes", "semana", "año", "dias_desde_inicio",
+                "caudal_lag1", "precipitacion_lag1", "caudal_x_mes", "precipitacion_x_semana"]
+    X = df[features]
+    y = df["nivel"]
+
+    modelo = RandomForestRegressor(n_estimators=100, random_state=42)
+    modelo.fit(X, y)
+
+    # Forecast
     forecast_temp = forecast.copy()
     forecast_temp = forecast_temp.rename(columns={"yhat": "caudal"})
+
     forecast_temp["mes"] = forecast_temp["ds"].dt.month
+    forecast_temp["semana"] = forecast_temp["ds"].dt.isocalendar().week
     forecast_temp["año"] = forecast_temp["ds"].dt.year
+    forecast_temp["dias_desde_inicio"] = (forecast_temp["ds"] - df["fecha"].min()).dt.days
 
-    # Predecir el nivel estimado
-    forecast["nivel_estimado"] = reg.predict(forecast_temp[["caudal", "mes", "año"]])
+    forecast_temp["caudal_lag1"] = forecast_temp["caudal"].shift(1)
+    forecast_temp["precipitacion"] = 0
+    forecast_temp["precipitacion_lag1"] = 0
 
-    # Guardar RMSE dentro del objeto forecast para usarlo en app.py
-    forecast.attrs = {"rmse_nivel": rmse}
+    forecast_temp["caudal_x_mes"] = forecast_temp["caudal"] * forecast_temp["mes"]
+    forecast_temp["precipitacion_x_semana"] = forecast_temp["precipitacion"] * forecast_temp["semana"]
+
+    forecast_temp = forecast_temp.fillna(0)
+
+    forecast["nivel_estimado"] = modelo.predict(forecast_temp[features])
 
     return forecast
