@@ -94,77 +94,115 @@ with tab2:
     st.caption("Los datos corresponden a predicciones generadas con Prophet y regresión multivariable.")
 
 with tab3:
-    st.subheader("📍 Ubicación y origen de los datos – Estación H44 Antisana DJ Diguchi")
+    st.subheader("📍 Ubicación y origen de los datos – Sistema hídrico del Antisana")
 
-    # Texto explicativo de origen de datos
     st.markdown("""
-    Los datos utilizados para el análisis y la predicción del nivel de agua fueron obtenidos de la estación hidrométrica **H44 – Antisana DJ Diguchi**, ubicada en el Parque Nacional Antisana, provincia de Pichincha.
+    Los datos utilizados para el análisis y predicción provienen de un conjunto de estaciones ubicadas en el **Parque Nacional Antisana**, que forman parte del sistema hídrico que abastece a Quito.
 
-    - **📌 Tipo:** Hidrométrica  
-    - **🌐 Latitud:** `-0.5683880379564397`  
-    - **🌐 Longitud:** `-78.2298390801277`  
-    - **📅 Datos usados:** Nivel de agua, caudal y precipitación (datos horarios)
+    - **📌 Estación – Antisana DJ Diguchi:**  
+       
+    - **📌 Estación  – Antisana Ramón Huañuna:**  
+   
+    - **📌 Estación – Antisana Limboasi:**  
+      
+    Además, se consideran los principales ríos que alimentan el embalse La Mica, como el **río Diguchi, río Antisana y río Jatunhuaycu**, que recogen agua de deshielos y lluvias en el ecosistema del Antisana.
 
-    Esta información fue tomada del portal oficial **[PARAMH₂O](https://paramh2o.ana.gob.ec/)**, donde se validó la disponibilidad y consistencia de los datos frente a otras estaciones del sistema Antisana.
+Este sistema conjunto permite comprender la dinámica hídrica que garantiza el abastecimiento de agua potable a Quito mediante el embalse **La Mica** y la planta **El Troje**.
     """)
 
-    # Mostrar mapa interactivo con folium
     import folium
     import streamlit.components.v1 as components
 
-    lat = -0.5683880379564397
-    lon = -78.2298390801277
+    mapa = folium.Map(location=[-0.568, -78.229], zoom_start=11)
 
-    error_text = f"{rmse:.2f} m" if rmse is not None else "No disponible"
-    popup_html = f"""
-    <b>Estación H44 Antisana DJ Diguchi</b><br>
-    Nivel actual: {nivel_actual:.2f} m<br>
-    Nivel máximo: {nivel_max:.2f} m<br>
-    Nivel mínimo: {nivel_min:.2f} m<br>
-    Error del modelo (RMSE): {error_text}
-    """
-
-    mapa = folium.Map(location=[lat, lon], zoom_start=11)
+        # 🟩 Estación principal (ahora con mismo estilo que las otras)
     folium.Marker(
-        location=[lat, lon],
-        popup=folium.Popup(popup_html, max_width=300),
-        tooltip="H44 Antisana DJ Diguchi",
-        icon=folium.Icon(color="blue", icon="info-sign")
+        location=[-0.5683880379564397, -78.2298390801277],
+        popup="Estación H44 Antisana DJ Diguchi",
+        tooltip="H44 DJ Diguchi",
+        icon=folium.Icon(color="green", icon="leaf")
     ).add_to(mapa)
 
+    # 🟢 Otras estaciones
+    estaciones_adicionales = [
+        {"nombre": "Estación Antisana Ramón Huañuna", "lat": -0.6022867145410288, "lon": -78.1986689291808},
+        {"nombre": "Estación Antisana Limboasi", "lat": -0.5934839659614135, "lon": -78.20825370752031},
+    ]
+
+
+    for est in estaciones_adicionales:
+        folium.Marker(
+            location=[est["lat"], est["lon"]],
+            popup=est["nombre"],
+            tooltip=est["nombre"],
+            icon=folium.Icon(color="green", icon="leaf")
+        ).add_to(mapa)
+
+    # 🔵 Embalse La Mica
+    folium.CircleMarker(
+        location=[-0.53806, -78.21015],
+        radius=12,
+        popup="Embalse La Mica",
+        color="red",
+        fill=True,
+        fill_opacity=0.5
+    ).add_to(mapa)
+
+    # 💧 Río Diguchi
+    folium.Marker(
+    location=[-0.5683880379564397, -78.2398390801277],
+    popup="Río Diguchi - Estación H44 DJ Diguchi",
+    tooltip="Río Diguchi (H44 DJ Diguchi)",
+    icon=folium.Icon(color="blue", icon="tint")
+    ).add_to(mapa)
+
+
+    # 💧 Río Antisana
+    folium.Marker(
+        location=[-0.5783880379564397, -78.2298390801277],
+        popup="Río Antisana",
+        tooltip="Río Antisana",
+        icon=folium.Icon(color="blue", icon="tint")
+    ).add_to(mapa)
+
+    # 💧 Río Jatunyacu
+    folium.Marker(
+        location=[-1.03961, -77.97536],
+        popup="Río Jatunyacu",
+        tooltip="Río Jatunyacu",
+        icon=folium.Icon(color="blue", icon="tint")
+    ).add_to(mapa)
+
+        # 🏭 Planta de tratamiento El Troje
+    folium.Marker(
+        location=[-0.33343, -78.52261],
+        popup="Planta de tratamiento El Troje",
+        tooltip="El Troje",
+        icon=folium.Icon(color="darkred", icon="industry", prefix='fa')
+    ).add_to(mapa)
+
+
+    # Renderizar mapa
     mapa.get_root().html.add_child(folium.Element("""
         <style>
-        html, body, #map {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
+        html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; }
         </style>
     """))
-
     mapa_html = mapa.get_root().render()
     components.html(f"""
-        <div style="width: 100vw; height: 600px;">
+        <div style="width: 100%; height: 600px;">
             {mapa_html}
         </div>
     """, height=600)
 
-    # Imagen del flujo de agua centrada y más pequeña
+    # Imagen del flujo de agua
     import base64
-
-    st.markdown("### 🗺️ Flujo de agua desde el Antisana hacia la planta El Troje")
-
+    st.markdown("### 🗺️ Flujo del agua hacia la planta El Troje")
     with open("images/flujo_antisana_troje.png", "rb") as file:
-        encoded_image = base64.b64encode(file.read()).decode()
-
-    st.markdown(
-        f"""
-        <div style="display: flex; justify-content: center; margin-top: 10px;">
-            <img src="data:image/png;base64,{encoded_image}" 
-                 alt="Ruta aproximada del agua desde el Antisana hasta la planta de potabilización El Troje" 
-                 style="max-width: 50%; height: auto; border: 1px solid #ccc; border-radius: 8px;" />
+        encoded = base64.b64encode(file.read()).decode()
+    st.markdown(f"""
+        <div style="display: flex; justify-content: center;">
+            <img src="data:image/png;base64,{encoded}" style="max-width: 50%; border-radius: 8px;" />
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
+
