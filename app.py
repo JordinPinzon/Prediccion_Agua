@@ -7,7 +7,7 @@ from src.predecir_nivel import predecir_nivel
 
 # Configuración de la página
 st.set_page_config(page_title="Predicción H44", layout="wide")
-st.title("🔵 Predicción del Nivel de Agua – Estación H44 Antisana")
+st.title("🔵 Predicción del Nivel de Agua – Estación Antisana")
 
 # Cargar y procesar datos
 with st.spinner("Entrenando modelo y generando predicción..."):
@@ -26,7 +26,7 @@ if "yhat_upper" in forecast.columns:
 
 
 # Tabs
-tab1, tab2, tab3 = st.tabs(["📈 Visualización", "📥 Descarga de resultados", "🌍 Mapa de la estación"])
+tab1, tab2, tab3 = st.tabs(["📈 Visualización", "🌍 Mapa de la estación", "📥 Descarga de resultados"])
 
 with tab1:
     st.subheader("📊 Resumen de predicción")
@@ -86,24 +86,17 @@ with tab1:
     ax.legend()
     st.pyplot(fig)
 
-
 with tab2:
-    st.subheader("⬇️ Descarga de datos")
-    csv = forecast[["ds", "nivel_estimado"]].to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Descargar predicción como CSV", csv, "prediccion_nivel.csv", "text/csv")
-    st.caption("Los datos corresponden a predicciones generadas con Prophet y regresión multivariable.")
-
-with tab3:
     st.subheader("📍 Ubicación y origen de los datos – Sistema hídrico del Antisana")
 
     st.markdown("""
     Los datos utilizados para el análisis y predicción provienen de un conjunto de estaciones ubicadas en el **Parque Nacional Antisana**, que forman parte del sistema hídrico que abastece a Quito.
 
-    - **📌 Estación – Antisana DJ Diguchi:**  
+    -  Estación – Antisana DJ Diguchi:  
        
-    - **📌 Estación  – Antisana Ramón Huañuna:**  
+    -  Estación  – Antisana Diguchi: 
    
-    - **📌 Estación – Antisana Limboasi:**  
+    -  Estación – Río Antisana AC: 
       
     Además, se consideran los principales ríos que alimentan el embalse La Mica, como el **río Diguchi, río Antisana y río Jatunhuaycu**, que recogen agua de deshielos y lluvias en el ecosistema del Antisana.
 
@@ -125,8 +118,8 @@ Este sistema conjunto permite comprender la dinámica hídrica que garantiza el 
 
     # 🟢 Otras estaciones
     estaciones_adicionales = [
-        {"nombre": "Estación Antisana Ramón Huañuna", "lat": -0.6022867145410288, "lon": -78.1986689291808},
-        {"nombre": "Estación Antisana Limboasi", "lat": -0.5934839659614135, "lon": -78.20825370752031},
+        {"nombre": "Estación Antisana Diguchi", "lat": -0.6022867145410288, "lon": -78.1986689291808},
+        {"nombre": "Estación Río Antisana AC", "lat": -0.5934839659614135, "lon": -78.20825370752031},
     ]
 
 
@@ -167,7 +160,7 @@ Este sistema conjunto permite comprender la dinámica hídrica que garantiza el 
 
     # 💧 Río Jatunyacu
     folium.Marker(
-        location=[-1.03961, -77.97536],
+        location=[-0.4935, -78.1810],
         popup="Río Jatunyacu",
         tooltip="Río Jatunyacu",
         icon=folium.Icon(color="blue", icon="tint")
@@ -205,4 +198,13 @@ Este sistema conjunto permite comprender la dinámica hídrica que garantiza el 
             <img src="data:image/png;base64,{encoded}" style="max-width: 50%; border-radius: 8px;" />
         </div>
     """, unsafe_allow_html=True)
+
+
+
+with tab3:
+    st.subheader("⬇️ Descarga de datos")
+    csv = forecast[["ds", "nivel_estimado"]].to_csv(index=False).encode("utf-8")
+    st.download_button("📥 Descargar predicción como CSV", csv, "prediccion_nivel.csv", "text/csv")
+    st.caption("Los datos corresponden a predicciones generadas con Prophet y regresión multivariable.")
+
 
