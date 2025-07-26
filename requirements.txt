@@ -5,3 +5,5 @@ scikit-learn
 prophet
 folium
 geopandas
+google-generativeai
+python-dotenv

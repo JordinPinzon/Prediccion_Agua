@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from src.preparar_datos import cargar_y_unir_datos
 from src.entrenar_modelo import entrenar_modelo_caudal
 from src.predecir_nivel import predecir_nivel
+from src.recomendaciones_ia import generar_recomendaciones_operativas
+
 
 # Configuración de la página
 st.set_page_config(page_title="Predicción H44", layout="wide")
@@ -26,7 +28,7 @@ if "yhat_upper" in forecast.columns:
 
 
 # Tabs
-tab1, tab2, tab3 = st.tabs(["📈 Visualización", "🌍 Mapa de la estación", "📥 Descarga de resultados"])
+tab1, tab2, tab3 = st.tabs(["📈 Visualización", "🌍 Mapa de la estación", "🧠 Recomendación con IA"])
 
 with tab1:
     st.subheader("📊 Resumen de predicción")
@@ -69,22 +71,32 @@ with tab1:
 
     fig, ax = plt.subplots(figsize=(14, 6))
     ax.plot(df_filtrado["ds"], df_filtrado["nivel_estimado"], label="Nivel estimado", color="#1f77b4", linewidth=2)
+    
+    # Línea de alerta crítica
     nivel_critico = 5.0
     ax.axhline(y=nivel_critico, color='red', linestyle='--', label=f'Alerta crítica ({nivel_critico} m)')
+
+    # Intervalo de confianza (si existe)
     if "yhat_lower" in df_filtrado.columns and "yhat_upper" in df_filtrado.columns:
         ax.fill_between(df_filtrado["ds"], df_filtrado["yhat_lower"], df_filtrado["yhat_upper"],
                         color="#1f77b4", alpha=0.2, label="Intervalo de confianza")
 
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Nivel estimado (m)")
-    ax.set_title("Predicción del Nivel de Agua hasta 2023")
-
-    # 👉 Recorte explícito al 2023
-    ax.set_xlim(left=df_filtrado["ds"].min(), right=pd.Timestamp("2023-01-01 23:59:59"))
-
+    ax.set_title(f"Predicción del Nivel de Agua ({rango_inicio.date()} a {rango_fin.date()})")
+    ax.set_xlim(left=rango_inicio, right=rango_fin)
     ax.grid()
     ax.legend()
     st.pyplot(fig)
+
+    # 💾 Agregar botón de descarga para CSV filtrado
+    csv_filtrado = df_filtrado[["ds", "nivel_estimado"]].to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="📥 Descargar predicción filtrada como CSV",
+        data=csv_filtrado,
+        file_name="prediccion_nivel_filtrada.csv",
+        mime="text/csv"
+    )
 
 with tab2:
     st.subheader("📍 Ubicación y origen de los datos – Sistema hídrico del Antisana")
@@ -202,9 +214,18 @@ Este sistema conjunto permite comprender la dinámica hídrica que garantiza el 
 
 
 with tab3:
-    st.subheader("⬇️ Descarga de datos")
-    csv = forecast[["ds", "nivel_estimado"]].to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Descargar predicción como CSV", csv, "prediccion_nivel.csv", "text/csv")
-    st.caption("Los datos corresponden a predicciones generadas con Prophet y regresión multivariable.")
+    st.subheader("💡 Recomendaciones Operativas Inteligentes con IA")
+
+    st.markdown("""
+    Este módulo genera sugerencias automáticas basadas en las predicciones de nivel de agua y precipitaciones,
+    usando inteligencia artificial de Gemini. Las recomendaciones están pensadas para operadores técnicos del sistema hídrico.
+    """)
+
+    if st.button("🧠 Generar recomendaciones con Gemini"):
+        with st.spinner("Analizando datos y generando recomendaciones..."):
+            recomendaciones = generar_recomendaciones_operativas(forecast)
+            st.success("✅ Recomendaciones generadas:")
+            st.markdown(recomendaciones)
+
 
 

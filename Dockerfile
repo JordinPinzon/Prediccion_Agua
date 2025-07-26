@@ -9,4 +9,7 @@ RUN pip install --upgrade pip && \
 
 EXPOSE 8501
 
+ENV GEMINI_API_KEY=${GEMINI_API_KEY}
+
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+
