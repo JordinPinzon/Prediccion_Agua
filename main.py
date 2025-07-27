@@ -19,10 +19,25 @@ forecast = predecir_nivel(forecast, df)
 
 # Paso 5: Visualizar predicción de nivel
 plt.figure(figsize=(12,6))
-plt.plot(forecast["ds"], forecast["nivel_estimado"], label="Nivel estimado")
-plt.title("Predicción del nivel de agua hasta 2026")
+
+# Línea del nivel estimado
+plt.plot(forecast["ds"], forecast["nivel_estimado"], label="Nivel estimado", color="royalblue")
+
+# Intervalo de confianza (usa los valores de Prophet antes de predecir nivel, si quieres, o crea unos artificiales alrededor del nivel estimado)
+# Aquí generamos uno aproximado de ±10% para visualización
+confianza_inferior = forecast["nivel_estimado"] * 0.9
+confianza_superior = forecast["nivel_estimado"] * 1.1
+plt.fill_between(forecast["ds"], confianza_inferior, confianza_superior, color="skyblue", alpha=0.3, label="Intervalo de confianza")
+
+# Línea de alerta crítica
+plt.axhline(y=5.0, color="red", linestyle="--", label="Alerta crítica (5.0 m)")
+
+# Personalización
+plt.title(f"Predicción del Nivel de Agua ({forecast['ds'].min().date()} a {forecast['ds'].max().date()})")
 plt.xlabel("Fecha")
-plt.ylabel("Nivel (m)")
-plt.grid()
+plt.ylabel("Nivel estimado (m)")
 plt.legend()
+plt.grid(True)
+plt.tight_layout()
 plt.show()
+

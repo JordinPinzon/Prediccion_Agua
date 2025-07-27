@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+from dotenv import load_dotenv
+import os
 import matplotlib.pyplot as plt
 from src.preparar_datos import cargar_y_unir_datos
 from src.entrenar_modelo import entrenar_modelo_caudal
@@ -18,7 +20,7 @@ with st.spinner("Entrenando modelo y generando predicción..."):
     forecast = predecir_nivel(forecast, df)
 
     # Limitar forecast completo hasta 2023 incluyendo columnas de confianza
-forecast = forecast.loc[forecast["ds"] < pd.to_datetime("2024-01-01")].copy()
+forecast = forecast.loc[forecast["ds"] < pd.to_datetime("2026-01-01")].copy()
 
 # Eliminar columnas fuera del rango también si existen
 if "yhat_lower" in forecast.columns:
@@ -60,26 +62,51 @@ with tab1:
         format="YYYY-MM-DD"
     )
 
-    # ✅ Línea corregida aquí:
-    st.info("📅 Última fecha de predicción: 2023-12-31")
+    st.info("📅 Última fecha de predicción: 2025-12-31")
 
     rango_inicio = pd.to_datetime(rango[0])
     rango_fin = pd.to_datetime(rango[1])
-    df_filtrado = forecast[(forecast["ds"] >= rango_inicio) & (forecast["ds"] <= rango_fin)]
+    df_filtrado = forecast[(forecast["ds"] >= rango_inicio) & (forecast["ds"] <= rango_fin)].copy()
+
+    # Suavizar la serie estimada
+    df_filtrado["nivel_estimado"] = df_filtrado["nivel_estimado"].rolling(window=7, min_periods=1).mean()
+
+    # Suavizar también los intervalos de confianza si existen
+    if "nivel_estimado_lower" in df_filtrado.columns and "nivel_estimado_upper" in df_filtrado.columns:
+        df_filtrado["nivel_estimado_lower"] = df_filtrado["nivel_estimado_lower"].rolling(window=7, min_periods=1).mean()
+        df_filtrado["nivel_estimado_upper"] = df_filtrado["nivel_estimado_upper"].rolling(window=7, min_periods=1).mean()
+
 
     st.subheader("📈 Nivel de Agua Estimado")
 
+    # Aplicar suavizado directamente en nueva columna
+    df_filtrado["nivel_estimado"] = df_filtrado["nivel_estimado"].rolling(window=7, min_periods=1).mean()
+
     fig, ax = plt.subplots(figsize=(14, 6))
-    ax.plot(df_filtrado["ds"], df_filtrado["nivel_estimado"], label="Nivel estimado", color="#1f77b4", linewidth=2)
-    
+    ax.plot(
+        df_filtrado["ds"],
+        df_filtrado["nivel_estimado"],
+        label="Nivel estimado (suavizado)",
+        color="#1f77b4",
+        linewidth=2,
+        solid_capstyle='round'
+    )
+
+
     # Línea de alerta crítica
     nivel_critico = 5.0
     ax.axhline(y=nivel_critico, color='red', linestyle='--', label=f'Alerta crítica ({nivel_critico} m)')
 
-    # Intervalo de confianza (si existe)
-    if "yhat_lower" in df_filtrado.columns and "yhat_upper" in df_filtrado.columns:
-        ax.fill_between(df_filtrado["ds"], df_filtrado["yhat_lower"], df_filtrado["yhat_upper"],
-                        color="#1f77b4", alpha=0.2, label="Intervalo de confianza")
+    # ✅ Intervalo de confianza real del nivel estimado (si existe)
+    if "nivel_estimado_lower" in df_filtrado.columns and "nivel_estimado_upper" in df_filtrado.columns:
+        ax.fill_between(
+            df_filtrado["ds"],
+            df_filtrado["nivel_estimado_lower"],
+            df_filtrado["nivel_estimado_upper"],
+            color="#1f77b4",
+            alpha=0.2,
+            label="Intervalo de confianza"
+        )
 
     ax.set_xlabel("Fecha")
     ax.set_ylabel("Nivel estimado (m)")
@@ -98,7 +125,21 @@ with tab1:
         mime="text/csv"
     )
 
+
 with tab2:
+
+ # Imagen del flujo de agua
+    import base64
+    st.markdown("### 🗺️ Flujo del agua hacia la planta El Troje")
+    with open("images/flujo_antisana_troje.png", "rb") as file:
+        encoded = base64.b64encode(file.read()).decode()
+    st.markdown(f"""
+        <div style="display: flex; justify-content: center;">
+            <img src="data:image/png;base64,{encoded}" style="max-width: 90%; border-radius: 8px;" />
+        </div>
+    """, unsafe_allow_html=True)
+
+
     st.subheader("📍 Ubicación y origen de los datos – Sistema hídrico del Antisana")
 
     st.markdown("""
@@ -200,32 +241,69 @@ Este sistema conjunto permite comprender la dinámica hídrica que garantiza el 
         </div>
     """, height=600)
 
-    # Imagen del flujo de agua
-    import base64
-    st.markdown("### 🗺️ Flujo del agua hacia la planta El Troje")
-    with open("images/flujo_antisana_troje.png", "rb") as file:
-        encoded = base64.b64encode(file.read()).decode()
-    st.markdown(f"""
-        <div style="display: flex; justify-content: center;">
-            <img src="data:image/png;base64,{encoded}" style="max-width: 50%; border-radius: 8px;" />
-        </div>
-    """, unsafe_allow_html=True)
-
 
 
 with tab3:
-    st.subheader("💡 Recomendaciones Operativas Inteligentes con IA")
-
+    # Encabezado visual atractivo
     st.markdown("""
-    Este módulo genera sugerencias automáticas basadas en las predicciones de nivel de agua y precipitaciones,
-    usando inteligencia artificial de Gemini. Las recomendaciones están pensadas para operadores técnicos del sistema hídrico.
-    """)
+    <h2 style='text-align: center;'>💬 Chat inteligente de recomendaciones</h2>
+    <p style='text-align: center;'>Consulta sobre el embalse o las predicciones a futuro usando IA</p>
+    """, unsafe_allow_html=True)
 
-    if st.button("🧠 Generar recomendaciones con Gemini"):
-        with st.spinner("Analizando datos y generando recomendaciones..."):
-            recomendaciones = generar_recomendaciones_operativas(forecast)
-            st.success("✅ Recomendaciones generadas:")
-            st.markdown(recomendaciones)
+    # Icono decorativo arriba (opcional)
+    st.markdown("""
+    <div style="text-align: center;">
+        <img src="https://cdn-icons-png.flaticon.com/512/4712/4712109.png" width="60"/>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Inicializar historial si no existe
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    # Campo de entrada estilo chat
+    pregunta_usuario = st.chat_input("Haz tu pregunta al sistema hídrico del Antisana...")
+
+    # Procesar pregunta
+    if pregunta_usuario:
+        with st.spinner("🧠 Analizando y generando respuesta..."):
+            from src.recomendaciones_ia import modelo
+
+            contexto = forecast[["ds", "nivel_estimado"]].tail(30).to_string(index=False)
+            prompt = f"""
+Eres un experto en hidrología y gestión operativa del sistema hídrico del Antisana. 
+Estos son los últimos datos de predicción de nivel de agua (en metros) para los próximos 30 días:
+
+{contexto}
+
+Pregunta del operador:
+{pregunta_usuario}
+
+Responde de forma técnica, clara y específica:
+"""
+            respuesta = modelo.generate_content(prompt).text.strip()
+
+            # Guardar conversación
+            st.session_state.chat_history.append(("👤 Tú", pregunta_usuario))
+            st.session_state.chat_history.append(("🤖 IA", respuesta))
+
+    # Mostrar historial dentro de caja visual
+    with st.container():
+        st.markdown("""
+        <div style='background-color:#111827; padding: 20px; border-radius: 10px; color: white;'>
+        """, unsafe_allow_html=True)
+
+        for autor, mensaje in st.session_state.chat_history:
+            st.markdown(f"**{autor}:** {mensaje}")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Botón para limpiar conversación
+    if st.button("🔄 Limpiar conversación"):
+        st.session_state.chat_history = []
+        st.rerun()
+
+
 
 
 

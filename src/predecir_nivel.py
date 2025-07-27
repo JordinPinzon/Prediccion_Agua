@@ -1,5 +1,6 @@
 from sklearn.ensemble import RandomForestRegressor
 import pandas as pd
+import numpy as np
 
 def predecir_nivel(forecast, df_original):
     df = df_original.copy()
@@ -49,6 +50,16 @@ def predecir_nivel(forecast, df_original):
 
     forecast_temp = forecast_temp.fillna(0)
 
-    forecast["nivel_estimado"] = modelo.predict(forecast_temp[features])
+    # Predicción central
+    predicciones = modelo.predict(forecast_temp[features])
+    forecast["nivel_estimado"] = predicciones
+
+    # Calcular intervalos de confianza (basado en árboles individuales)
+    todas_predicciones = np.stack([tree.predict(forecast_temp[features]) for tree in modelo.estimators_], axis=0)
+    desviacion = todas_predicciones.std(axis=0)
+    
+    # Intervalo ±1.96 * std (95% confianza normal)
+    forecast["nivel_estimado_lower"] = forecast["nivel_estimado"] - 1.96 * desviacion
+    forecast["nivel_estimado_upper"] = forecast["nivel_estimado"] + 1.96 * desviacion
 
     return forecast
