@@ -7,6 +7,8 @@ from src.preparar_datos import cargar_y_unir_datos
 from src.entrenar_modelo import entrenar_modelo_caudal
 from src.predecir_nivel import predecir_nivel
 from src.recomendaciones_ia import generar_recomendaciones_operativas
+from datetime import datetime, timedelta
+
 
 
 # Configuración de la página
@@ -241,69 +243,108 @@ Este sistema conjunto permite comprender la dinámica hídrica que garantiza el 
         </div>
     """, height=600)
 
+    with tab3:
+        col1, col2 = st.columns(2)
+
+        # 👉 Columna izquierda: Análisis de Riesgo
+        with col1:
+            st.markdown("### ⚠️ Análisis de Riesgo Hídrico")
+
+            try:
+                if "analisis_riesgo_automatizado" not in st.session_state:
+                    with st.spinner("🔎 Generando análisis de riesgo..."):
+                        from src.recomendaciones_ia import modelo
+                        from datetime import datetime, timedelta
+
+                        # Calcular la fecha hace 1 año desde el último dato disponible
+                        fecha_final = pd.to_datetime(forecast["ds"].max())
+                        fecha_inicio = fecha_final - timedelta(days=365)
+
+                        # Filtrar el DataFrame para obtener solo los datos del último año
+                        ultimo_anio = forecast[(forecast["ds"] >= fecha_inicio) & (forecast["ds"] <= fecha_final)]
+
+                        # Crear el resumen a pasar al prompt
+                        contexto_riesgo = ultimo_anio[["ds", "nivel_estimado"]].to_string(index=False)
 
 
-with tab3:
-    # Encabezado visual atractivo
-    st.markdown("""
-    <h2 style='text-align: center;'>💬 Chat inteligente de recomendaciones</h2>
-    <p style='text-align: center;'>Consulta sobre el embalse o las predicciones a futuro usando IA</p>
-    """, unsafe_allow_html=True)
+                        prompt_riesgo = f"""
+     Actúa como un analista de riesgos hidrológicos. Según los siguientes datos de nivel de agua del último año, identifica como máximo tres riesgos relevantes (como desbordamiento, sequía o variabilidad).
 
-    # Icono decorativo arriba (opcional)
-    st.markdown("""
-    <div style="text-align: center;">
-        <img src="https://cdn-icons-png.flaticon.com/512/4712/4712109.png" width="60"/>
-    </div>
-    """, unsafe_allow_html=True)
+Para cada riesgo detectado, entrega el siguiente formato:
 
-    # Inicializar historial si no existe
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+1. 🔺 Riesgo: [Nombre del riesgo]
+   - Riesgo total: [número entre 1 y 25] → [Clasificación: Bajo (1-5), Medio (6-15), Alto (16-25)]
+   - Fechas críticas: [Indica fechas específicas o rangos donde se observa el riesgo]
 
-    # Campo de entrada estilo chat
-    pregunta_usuario = st.chat_input("Haz tu pregunta al sistema hídrico del Antisana...")
+Finaliza con una conclusión breve que resuma el estado del sistema.
 
-    # Procesar pregunta
-    if pregunta_usuario:
-        with st.spinner("🧠 Analizando y generando respuesta..."):
-            from src.recomendaciones_ia import modelo
+Evita explicaciones largas o fórmulas. Solo el análisis claro y directo.
 
-            contexto = forecast[["ds", "nivel_estimado"]].tail(30).to_string(index=False)
-            prompt = f"""
-Eres un experto en hidrología y gestión operativa del sistema hídrico del Antisana. 
-Estos son los últimos datos de predicción de nivel de agua (en metros) para los próximos 30 días:
+Datos:
+        {contexto_riesgo}
 
-{contexto}
+    Análisis de riesgo:
+    """
+                        st.session_state.analisis_riesgo_automatizado = modelo.generate_content(prompt_riesgo).text.strip()
 
-Pregunta del operador:
-{pregunta_usuario}
+                st.markdown(st.session_state.analisis_riesgo_automatizado)
 
-Responde de forma técnica, clara y específica:
-"""
-            respuesta = modelo.generate_content(prompt).text.strip()
+            except Exception as e:
+                st.error("❌ Error al generar el análisis de riesgo automáticamente.")
+                st.exception(e)
 
-            # Guardar conversación
-            st.session_state.chat_history.append(("👤 Tú", pregunta_usuario))
-            st.session_state.chat_history.append(("🤖 IA", respuesta))
+        # 👉 Columna derecha: Chat inteligente
+        with col2:
+            st.markdown("""
+            <h2 style='text-align: center;'>💬 Chat inteligente de recomendaciones</h2>
+            <p style='text-align: center;'>Consulta sobre el embalse o las predicciones a futuro usando IA</p>
+            """, unsafe_allow_html=True)
 
-    # Mostrar historial dentro de caja visual
-    with st.container():
-        st.markdown("""
-        <div style='background-color:#111827; padding: 20px; border-radius: 10px; color: white;'>
-        """, unsafe_allow_html=True)
+            st.markdown("""
+            <div style="text-align: center;">
+                <img src="https://cdn-icons-png.flaticon.com/512/4712/4712109.png" width="60"/>
+            </div>
+            """, unsafe_allow_html=True)
 
-        for autor, mensaje in st.session_state.chat_history:
-            st.markdown(f"**{autor}:** {mensaje}")
+            if "chat_history" not in st.session_state:
+                st.session_state.chat_history = []
 
-        st.markdown("</div>", unsafe_allow_html=True)
+            pregunta_usuario = st.chat_input("Haz tu pregunta al sistema hídrico del Antisana...")
 
-    # Botón para limpiar conversación
-    if st.button("🔄 Limpiar conversación"):
-        st.session_state.chat_history = []
-        st.rerun()
+            if pregunta_usuario:
+                with st.spinner("🧠 Analizando y generando respuesta..."):
+                    from src.recomendaciones_ia import modelo, generar_recomendaciones_operativas
 
+                    contexto = forecast[["ds", "nivel_estimado"]].tail(30).to_string(index=False)
+                    prompt = f"""
+    Eres un experto en hidrología y gestión operativa del sistema hídrico del Antisana. 
+    Estos son los últimos datos de predicción de nivel de agua (en metros) para los próximos 30 días:
 
+    {contexto}
 
+    Pregunta del operador:
+    {pregunta_usuario}
 
+    Responde de forma técnica, clara y específica:
+    """
+                    respuesta = modelo.generate_content(prompt).text.strip()
+                    analisis_riesgo = generar_recomendaciones_operativas(forecast)
+
+                    st.session_state.chat_history.append(("👤 Tú", pregunta_usuario))
+                    st.session_state.chat_history.append(("🤖 IA", respuesta))
+                    st.session_state.chat_history.append(("📊 Análisis de Riesgo", analisis_riesgo))
+
+            with st.container():
+                st.markdown("""
+                <div style='background-color:#111827; padding: 20px; border-radius: 10px; color: white;'>
+                """, unsafe_allow_html=True)
+
+                for autor, mensaje in st.session_state.chat_history:
+                    st.markdown(f"**{autor}:** {mensaje}")
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            if st.button("🔄 Limpiar conversación"):
+                st.session_state.chat_history = []
+                st.rerun()
 
