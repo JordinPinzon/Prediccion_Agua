@@ -315,18 +315,25 @@ Datos:
                 with st.spinner("🧠 Analizando y generando respuesta..."):
                     from src.recomendaciones_ia import modelo, generar_recomendaciones_operativas
 
-                    contexto = forecast[["ds", "nivel_estimado"]].tail(30).to_string(index=False)
+                    from datetime import timedelta
+
+                    # Calcular el contexto del último año
+                    fecha_final = pd.to_datetime(forecast["ds"].max())
+                    fecha_inicio = fecha_final - timedelta(days=365)
+                    contexto = forecast[(forecast["ds"] >= fecha_inicio) & (forecast["ds"] <= fecha_final)][["ds", "nivel_estimado"]].to_string(index=False)
+
                     prompt = f"""
-    Eres un experto en hidrología y gestión operativa del sistema hídrico del Antisana. 
-    Estos son los últimos datos de predicción de nivel de agua (en metros) para los próximos 30 días:
+                    Eres un experto en hidrología y gestión operativa del sistema hídrico del Antisana. 
+                    Estos son los datos de predicción de nivel de agua (en metros) para el último año:
 
-    {contexto}
+                    {contexto}
 
-    Pregunta del operador:
-    {pregunta_usuario}
+                    Pregunta del operador:
+                    {pregunta_usuario}
 
-    Responde de forma técnica, clara y específica:
-    """
+                    Responde de forma técnica, clara y específica:
+                    """
+
                     respuesta = modelo.generate_content(prompt).text.strip()
                     analisis_riesgo = generar_recomendaciones_operativas(forecast)
 
